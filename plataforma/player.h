@@ -1,26 +1,12 @@
 #pragma once
 #include "raylib.h"
+#include "animation.h"
 
 enum class PlayerState
 {
 	Idle,
-	Run
-};
-
-struct Animation
-{
-	//animação
-	int frameWidth;
-	int frameHeight;
-
-	int framesTotal;
-	int frameAtual = 0;
-
-	float frameTime;
-	float timer = 0.0f;
-
-	Rectangle frameRec;
-	Texture2D texture;
+	Run,
+	Hit
 };
 
 class Player
@@ -29,29 +15,54 @@ public:
 	Player(Vector2 startPos);
 	~Player();
 
-	void draw();
-	void update(float deltaTime, Rectangle collision);
-
+	void Update(float dt, Rectangle ground);
+	void Draw();
+	void DrawCollisionDebug();
+	
 private:
-	//moviment
-	Vector2 velocity;
-	float acceleration = 500.0f;
-	float gravity = 1200.0f;
-	bool isGrounded = false;
-
-	//position
 	Vector2 position;
 	Vector2 size;
-	
-	//player state
-	PlayerState state = PlayerState::Idle;
-	PlayerState previosState = PlayerState::Idle;
+	Vector2 velocity;
 
-	Animation idleAnim;
-	Animation walkAnim;
+	float moveInput = 0.0f;
+	float acceleration = 200.0f;
+	float gravity = 1200.0f;
+	float jumpForce = 500.0f;
+
+	float fallMultiplier = 1.8f;
+	float jumpCutMultiplier = 0.5f;
+
+	float coyoteTime = 0.1f;
+	float coyoteTimer = 0.0f;
+
+	float jumpBufferTime = 0.12f;
+	float jumpBufferTimer = 0.0f;
+
+	bool facingRight = true;
+	bool isGrounded = false;
+
+	bool jumpPressed = false;
+	bool jumpReleased = false;
+	bool attackPressed = false;
+
+	PlayerState state = PlayerState::Idle;
+
+	Animation idleAnim{};
+	Animation walkAnim{};
+	Animation hitAnim{};
 	Animation* currentAnim = nullptr;
 
-	void UpdateAnimation();
-	void ChangeState(PlayerState newState);
+private:
+	
 	void HandleControls();
+	void HandleJump(float dt);
+	void ApplyGravity(float dt);
+	void MoveHorizontal(float dt);
+	void MoveVertical(float dt);
+	void GroundCollision(Rectangle ground);
+	
+	void UpdateState();
+	bool IsStateLocked() const;
+	void ChangeState(PlayerState newState);
+	Rectangle GetCollisionRect() const;
 };
