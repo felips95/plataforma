@@ -6,6 +6,8 @@ enum class PlayerState
 {
 	Idle,
 	Run,
+	Jump,
+	Fall,
 	Hit
 };
 
@@ -18,6 +20,7 @@ public:
 	void Update(float dt, Rectangle ground);
 	void Draw();
 	void DrawCollisionDebug();
+	PlayerState GetState() const;
 	
 private:
 	Vector2 position;
@@ -48,7 +51,9 @@ private:
 	PlayerState state = PlayerState::Idle;
 
 	Animation idleAnim{};
-	Animation walkAnim{};
+	Animation runAnim{};
+	Animation jumpAnim{};
+	Animation fallAnim{};
 	Animation hitAnim{};
 	Animation* currentAnim = nullptr;
 
@@ -57,12 +62,12 @@ private:
 	void HandleControls();
 	void HandleJump(float dt);
 	void ApplyGravity(float dt);
-	void MoveHorizontal(float dt);
-	void MoveVertical(float dt);
+	void ApplyMovement(float dt);
 	void GroundCollision(Rectangle ground);
 	
 	void UpdateState();
 	bool IsStateLocked() const;
 	void ChangeState(PlayerState newState);
+
 	Rectangle GetCollisionRect() const;
 };

@@ -3,13 +3,13 @@
 Player::Player(Vector2 startPos)
 {
 	idleAnim = CreateAnimation("assets/idle.png", 11, 0.1f);
-	walkAnim = CreateAnimation("assets/run.png", 12, 0.07f);
-	hitAnim = CreateAnimation("assets/hit.png", 7, 0.03f);
-
-	hitAnim.looping = false;
+	runAnim = CreateAnimation("assets/run.png", 12, 0.07f);
+	jumpAnim = CreateAnimation("assets/jump.png", 1, 0.1f);
+	fallAnim = CreateAnimation("assets/fall.png", 1, 0.1f);
+	hitAnim = CreateAnimation("assets/hit.png", 7, 0.03f, false);
 
 	currentAnim = &idleAnim;
-
+	
 	size = {
 		(float)currentAnim->frameWidth,
 		(float)currentAnim->frameHeight
@@ -26,8 +26,10 @@ Player::Player(Vector2 startPos)
 Player::~Player()
 {
 	UnloadAnimation(idleAnim);
-	UnloadAnimation(walkAnim);
+	UnloadAnimation(runAnim);
 	UnloadAnimation(hitAnim);
+	UnloadAnimation(jumpAnim);
+	UnloadAnimation(fallAnim);
 }
 
 void Player::ChangeState(PlayerState newState)
@@ -39,8 +41,10 @@ void Player::ChangeState(PlayerState newState)
 	switch (state)
 	{
 	case PlayerState::Idle: currentAnim = &idleAnim; break;
-	case PlayerState::Run: currentAnim = &walkAnim; break;
+	case PlayerState::Run: currentAnim = &runAnim; break;
 	case PlayerState::Hit: currentAnim = &hitAnim; break;
+	case PlayerState::Jump: currentAnim = &jumpAnim; break;
+	case PlayerState::Fall: currentAnim = &fallAnim; break;
 	}
 
 	currentAnim->frameAtual = 0;
@@ -64,18 +68,17 @@ void Player::UpdateState()
 {
 	// Se o estado atual estiver travado,
 	// espera a animação terminar
-	if (IsStateLocked())
+	if (IsStateLocked() && !currentAnim->finished) return;
+
+
+	if (!isGrounded)
 	{
-		if (!currentAnim->finished)
-			return;
+		ChangeState(velocity.y <= 0.0f ? PlayerState::Jump : PlayerState::Fall);
 	}
-
-	// ===== ESTADOS NORMAIS =====
-
-	if (velocity.x != 0)
-		ChangeState(PlayerState::Run);
 	else
-		ChangeState(PlayerState::Idle);
+	{
+		ChangeState(moveInput != 0.0f ? PlayerState::Run : PlayerState::Idle);
+	}
 }
 
 void Player::HandleControls()
@@ -133,14 +136,13 @@ void Player::ApplyGravity(float dt)
 		velocity.y += gravity * fallMultiplier * dt;
 }
 
-void Player::MoveHorizontal(float dt)
+void Player::ApplyMovement(float dt)
 {
+	// HORIZONTAL
 	velocity.x = moveInput * acceleration;
 	position.x += velocity.x * dt;
-}
 
-void Player::MoveVertical(float dt)
-{
+	//VERTICAL
 	position.y += velocity.y * dt;
 }
 
@@ -157,20 +159,17 @@ void Player::GroundCollision(Rectangle ground)
 {
 	Rectangle col = GetCollisionRect();
 
-	if (CheckCollisionRecs(col, ground) && velocity.y >= 0)
+	if (CheckCollisionRecs(col, ground) && velocity.y >= 0.0f)
 	{
 		isGrounded = true;
-		velocity.y = 0;
+		velocity.y = 0.0f;
 		position.y = ground.y - size.y;
-	}
-	else
-	{
-		isGrounded = false;
 	}
 }
 
 void Player::Update(float dt, Rectangle ground)
 {
+
 	// INPUT
 	HandleControls();
 	HandleJump(dt);
@@ -182,11 +181,11 @@ void Player::Update(float dt, Rectangle ground)
 	}
 	
 	// MOVIMENTO
-	MoveHorizontal(dt);
 	ApplyGravity(dt);
-	MoveVertical(dt);
+	ApplyMovement(dt);
 	
 	// COLISÃO
+	isGrounded = false;
 	GroundCollision(ground);
 
 	// ESTADO
@@ -205,4 +204,9 @@ void Player::DrawCollisionDebug()
 {
 	Rectangle col = GetCollisionRect();
 	DrawRectangleLines((int)col.x, (int)col.y, (int)col.width, (int)col.height, RED);
+}
+
+PlayerState Player::GetState() const
+{
+	return state;
 }

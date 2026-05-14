@@ -19,7 +19,7 @@ struct Animation
 	Rectangle frameRec{};
 };
 
-Animation CreateAnimation(const char* file, int frames, float frameTime);
+Animation CreateAnimation(const char* file, int frames, float frameTime, bool looping = true);
 Rectangle GetSourceRect(const Animation& anim, bool facingRight);
 void UpdateAnimation(Animation& anim, float dt, bool facingRight);
 void UnloadAnimation(Animation& anim);
