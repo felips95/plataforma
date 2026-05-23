@@ -7,20 +7,21 @@ Player::Player(Vector2 startPos)
 	jumpAnim = CreateAnimation("assets/jump.png", 1, 0.1f);
 	fallAnim = CreateAnimation("assets/fall.png", 1, 0.1f);
 	hitAnim = CreateAnimation("assets/hit.png", 7, 0.03f, false);
+	doubleJumpAnim = CreateAnimation("assets/doubleJump.png", 6, 0.03f);
 
 	currentAnim = &idleAnim;
 	
-	size = {
-		(float)currentAnim->frameWidth,
-		(float)currentAnim->frameHeight
-	};
+	hitboxSize = {16.0f, 30.0f};
 
 	position = { 
-		startPos.x - (float)currentAnim->frameWidth,
-		startPos.y - (float)currentAnim->frameHeight
+		startPos.x,
+		startPos.y
 	};
 
+	spriteOffset = { (hitboxSize.x - (float)currentAnim->frameWidth) / 2.0f, hitboxSize.y - (float)currentAnim->frameHeight};
+
 	velocity = { 0.0f, 0.0f };
+	jumpsLeft = maxJumps;
 }
 
 Player::~Player()
@@ -45,6 +46,7 @@ void Player::ChangeState(PlayerState newState)
 	case PlayerState::Hit: currentAnim = &hitAnim; break;
 	case PlayerState::Jump: currentAnim = &jumpAnim; break;
 	case PlayerState::Fall: currentAnim = &fallAnim; break;
+	case PlayerState::DoubleJump: currentAnim = &doubleJumpAnim; break;
 	}
 
 	currentAnim->frameAtual = 0;
@@ -70,6 +72,11 @@ void Player::UpdateState()
 	// espera a animação terminar
 	if (IsStateLocked() && !currentAnim->finished) return;
 
+	if (state == PlayerState::DoubleJump)
+	{
+		if (velocity.y > 0.0f) ChangeState(PlayerState::Fall);
+		else return;
+	}
 
 	if (!isGrounded)
 	{
@@ -116,14 +123,34 @@ void Player::HandleJump(float dt)
 	else if (coyoteTimer > 0.0f)
 		coyoteTimer -= dt;
 
-	if (jumpBufferTimer > 0.0f && coyoteTimer > 0.0f)
+	//logica de pulo
+	if (jumpBufferTimer > 0.0f)
 	{
-		velocity.y = -jumpForce;
-		isGrounded = false;
-		jumpBufferTimer = 0.0f;
-		coyoteTimer = 0.0f;
+		if (coyoteTimer > 0.0f)
+		{
+			velocity.y = -jumpForce;
+			isGrounded = false;
+			jumpsLeft--;
+			jumpBufferTimer = 0.0f;
+			coyoteTimer = 0.0f;
+			ChangeState(PlayerState::Jump);
+		}
+		else if (jumpsLeft > 0)
+		{
+			velocity.y = -jumpForce;
+			jumpsLeft--;
+			jumpBufferTimer = 0.0f;
+
+			ChangeState(PlayerState::DoubleJump);
+		}
 	}
 
+	if (!isGrounded && coyoteTimer <= 0.0f && jumpsLeft == maxJumps)
+	{
+		jumpsLeft = maxJumps - 1;
+	}
+
+	//Variavel da altura de pulo (jump cut)
 	if (jumpReleased && velocity.y < 0.0f)
 		velocity.y *= jumpCutMultiplier;
 }
@@ -136,38 +163,50 @@ void Player::ApplyGravity(float dt)
 		velocity.y += gravity * fallMultiplier * dt;
 }
 
-void Player::ApplyMovement(float dt)
+void Player::ApplyMovement(float dt, TileMap& map)
 {
 	// HORIZONTAL
 	velocity.x = moveInput * acceleration;
+	float oldX = position.x;
 	position.x += velocity.x * dt;
 
+	if (map.CheckCollision(GetHitbox()))
+	{
+		position.x = oldX;
+		velocity.x = 0.0f;
+	}
+
 	//VERTICAL
+	float oldY = position.y;
 	position.y += velocity.y * dt;
-}
 
-Rectangle Player::GetCollisionRect() const
-{
-	float collisionOffsetX = 10.0f;
-	Vector2 collisionSize{ size.x - collisionOffsetX, size.y };
-	Vector2 collisionPos{ position.x + collisionOffsetX / 2.0f, position.y };
+	if (map.CheckCollision(GetHitbox()))
+	{
+		position.y = oldY;
+		velocity.y = 0.0f;
+	}
 
-	return { collisionPos.x, collisionPos.y, collisionSize.x, collisionSize.y };
-}
+	Rectangle groundSensor = GetHitbox();
+	groundSensor.y += 0.5f;
 
-void Player::GroundCollision(Rectangle ground)
-{
-	Rectangle col = GetCollisionRect();
-
-	if (CheckCollisionRecs(col, ground) && velocity.y >= 0.0f)
+	if (map.CheckCollision(groundSensor) && velocity.y >= 0.0f)
 	{
 		isGrounded = true;
+		jumpsLeft = maxJumps;
 		velocity.y = 0.0f;
-		position.y = ground.y - size.y;
+	}
+	else
+	{
+		isGrounded = false;
 	}
 }
 
-void Player::Update(float dt, Rectangle ground)
+Rectangle Player::GetHitbox() const
+{
+	return { position.x, position.y, hitboxSize.x, hitboxSize.y };
+}
+
+void Player::Update(float dt, TileMap& map)
 {
 
 	// INPUT
@@ -180,30 +219,32 @@ void Player::Update(float dt, Rectangle ground)
 		ChangeState(PlayerState::Hit);
 	}
 	
-	// MOVIMENTO
+	// FÍSICA
 	ApplyGravity(dt);
-	ApplyMovement(dt);
-	
-	// COLISÃO
-	isGrounded = false;
-	GroundCollision(ground);
+	ApplyMovement(dt, map);
 
-	// ESTADO
+	// ESTADO E ANIMAÇÃO
 	UpdateState();
-
-	// ANIMAÇÃO
 	UpdateAnimation(*currentAnim, dt, facingRight);
 }
 
 void Player::Draw()
 {
-	DrawTextureRec(currentAnim->texture, currentAnim->frameRec, position, WHITE);
+	Vector2 drawPos = {
+		position.x + spriteOffset.x,
+		position.y + spriteOffset.y
+	};
+
+	DrawTextureRec(currentAnim->texture, currentAnim->frameRec, drawPos, WHITE);
 }
 
 void Player::DrawCollisionDebug()
 {
-	Rectangle col = GetCollisionRect();
+	Rectangle col = GetHitbox();
 	DrawRectangleLines((int)col.x, (int)col.y, (int)col.width, (int)col.height, RED);
+
+	// Dica visual extra: Desenhe um pequeno ponto verde indicando a origem do player (0,0 da hitbox)
+	DrawCircle((int)position.x, (int)position.y, 2.0f, GREEN);
 }
 
 PlayerState Player::GetState() const

@@ -1,4 +1,5 @@
 #include "player.h"
+#include "tilemap.h"
 
 int main()
 {
@@ -7,22 +8,31 @@ int main()
 	InitWindow(windowWidth, windowHeight, "meu joguinho");
 	SetTargetFPS(144);
 
-	Player player({ (float)(windowWidth / 2), (float)(windowHeight / 2) });
-	Rectangle ground = { 0.0f, (float)windowHeight - 100.0f, (float)windowWidth - 500.0f, 100.0f };
+	Player player({80,80});
+
+	TileMap map;
+	map.Load("assets/mapa.tmx");
+	Texture2D tileset = LoadTexture("assets/terrain.png");
 
 	while(!WindowShouldClose()) 
 	{
 		float deltaTime = GetFrameTime();
-		player.Update(deltaTime, ground);
+		player.Update(deltaTime, map);
 
 		BeginDrawing();
-		ClearBackground(WHITE);
+		ClearBackground(SKYBLUE);
 
-		DrawRectangleRec(ground, BROWN);
+		map.Draw(tileset);
 		player.Draw();
-		DrawText(TextFormat("State: %d", (int)player.GetState()), 20, 20, 20, BLACK);
+		player.DrawCollisionDebug();
+
+		//Text
+		DrawText(TextFormat("State: %d", (int)player.GetState()), 60, 60, 20, BLACK);
+		DrawText(TextFormat("Jump: %d", player.jumpsLeft), 60, 80, 20, BLACK);
 
 		EndDrawing();
 	}
+	UnloadTexture(tileset);
 	CloseWindow();
+	return 0;
 }

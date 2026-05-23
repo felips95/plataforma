@@ -1,6 +1,7 @@
 #pragma once
 #include "raylib.h"
 #include "animation.h"
+#include "tilemap.h"
 
 enum class PlayerState
 {
@@ -8,7 +9,8 @@ enum class PlayerState
 	Run,
 	Jump,
 	Fall,
-	Hit
+	Hit,
+	DoubleJump
 };
 
 class Player
@@ -17,20 +19,26 @@ public:
 	Player(Vector2 startPos);
 	~Player();
 
-	void Update(float dt, Rectangle ground);
+	int jumpsLeft;
+	int maxJumps = 2;
+
+	void Update(float dt, TileMap& map);
 	void Draw();
 	void DrawCollisionDebug();
 	PlayerState GetState() const;
 	
 private:
 	Vector2 position;
-	Vector2 size;
 	Vector2 velocity;
+
+	Vector2 hitboxSize;
+	Vector2 spriteOffset;
 
 	float moveInput = 0.0f;
 	float acceleration = 200.0f;
 	float gravity = 1200.0f;
 	float jumpForce = 500.0f;
+	
 
 	float fallMultiplier = 1.8f;
 	float jumpCutMultiplier = 0.5f;
@@ -55,6 +63,7 @@ private:
 	Animation jumpAnim{};
 	Animation fallAnim{};
 	Animation hitAnim{};
+	Animation doubleJumpAnim{};
 	Animation* currentAnim = nullptr;
 
 private:
@@ -62,12 +71,10 @@ private:
 	void HandleControls();
 	void HandleJump(float dt);
 	void ApplyGravity(float dt);
-	void ApplyMovement(float dt);
-	void GroundCollision(Rectangle ground);
+	void ApplyMovement(float dt, TileMap& map);
 	
 	void UpdateState();
 	bool IsStateLocked() const;
 	void ChangeState(PlayerState newState);
-
-	Rectangle GetCollisionRect() const;
+	Rectangle GetHitbox() const;
 };
